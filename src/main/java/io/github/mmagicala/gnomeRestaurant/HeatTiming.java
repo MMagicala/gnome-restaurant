@@ -26,30 +26,7 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
-
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+public enum HeatTiming
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
-	{
-		return true;
-	}
+	BEFORE_ADDING_INGREDS,AFTER_ADDING_INGREDS
 }

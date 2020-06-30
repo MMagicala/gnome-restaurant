@@ -24,32 +24,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.github.mmagicala.gnomeRestaurant;
+package io.github.mmagicala.gnomeRestaurant.itemOrder;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
+import io.github.mmagicala.gnomeRestaurant.CookingItem;
+import io.github.mmagicala.gnomeRestaurant.ItemOrderType;
+import java.util.ArrayList;
+import lombok.Getter;
 
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+public class BakedToppedOrder extends BakedOrder
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
-	{
-		return true;
-	}
+	@Getter
+	private int unfinishedId;
 
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
+	public BakedToppedOrder(ItemOrderType itemOrderType, int halfMadeId, int unfinishedId, int itemId, ArrayList<CookingItem> cookingItems)
 	{
-		return true;
+		super(itemOrderType, halfMadeId, itemId, cookingItems);
+		this.unfinishedId = unfinishedId;
 	}
 }

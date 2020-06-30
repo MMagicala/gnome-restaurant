@@ -26,30 +26,20 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
-
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+public enum MinigameStage
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
-	{
-		return true;
-	}
+	CREATE_MOULD("Create the mould"),
+	BAKE_MOULD("Bake the mould"),
+	COMBINE_INGREDIENTS("Apply 1st ingredients"),
+	POUR("Pour into cocktail glass"),
+	TOP_WITH_INGREDIENTS("Apply 2nd ingredients"),
+	HEAT_AGAIN("Heat item again"),
+	DELIVER("Deliver item");
 
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
+	String directions;
+
+	MinigameStage(String directions)
 	{
-		return true;
+		this.directions = directions;
 	}
 }

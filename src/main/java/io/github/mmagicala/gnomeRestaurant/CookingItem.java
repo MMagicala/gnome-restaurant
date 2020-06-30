@@ -26,30 +26,23 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
+import lombok.Getter;
 
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+public class CookingItem
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
-	{
-		return true;
+	@Getter
+	private int itemId, count;
+
+	@Getter
+	private boolean usedLater;
+
+	public CookingItem(int itemId, int count){
+		this(itemId, count, false);
 	}
 
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
-	{
-		return true;
+	public CookingItem(int itemId, int count, boolean usedLater){
+		this.itemId = itemId;
+		this.count = count;
+		this.usedLater = usedLater;
 	}
 }

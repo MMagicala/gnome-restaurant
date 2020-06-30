@@ -24,32 +24,29 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.github.mmagicala.gnomeRestaurant;
+package io.github.mmagicala.gnomeRestaurant.itemOrder;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
+import io.github.mmagicala.gnomeRestaurant.CookingItem;
+import io.github.mmagicala.gnomeRestaurant.HeatTiming;
+import io.github.mmagicala.gnomeRestaurant.MinigameStage;
+import java.util.ArrayList;
+import lombok.Getter;
 
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+// HBP: Heat before pouring
+public class HeatedCocktailOrder extends CocktailOrder
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
-	{
-		return true;
-	}
+	@Getter
+	private HeatTiming heatTiming;
 
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
+	@Getter
+	private int pouredMixId, secondPouredMixId;
+
+	public HeatedCocktailOrder(HeatTiming heatTiming, int shakerMixId, int pouredMixId, int secondPouredMixId, int itemId, ArrayList<CookingItem> ingredients)
 	{
-		return true;
+		super(shakerMixId, itemId, ingredients);
+
+		this.heatTiming = heatTiming;
+		this.pouredMixId = pouredMixId;
+		this.secondPouredMixId = secondPouredMixId;
 	}
 }

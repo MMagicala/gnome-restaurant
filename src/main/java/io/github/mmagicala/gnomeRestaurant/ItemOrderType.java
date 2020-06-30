@@ -26,30 +26,22 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
+import lombok.Getter;
+import net.runelite.api.ItemID;
 
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+public enum ItemOrderType
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
-	{
-		return true;
-	}
+	COCKTAIL(-1, -1, ItemID.COCKTAIL_SHAKER),
+	CRUNCHIES(ItemID.RAW_CRUNCHIES, ItemID.HALF_BAKED_CRUNCHY, ItemID.CRUNCHY_TRAY),
+	BATTA(ItemID.RAW_BATTA, ItemID.HALF_BAKED_BATTA, ItemID.BATTA_TIN),
+	GNOMEBOWL(ItemID.RAW_GNOMEBOWL, ItemID.HALF_BAKED_BOWL, ItemID.GNOMEBOWL_MOULD);
 
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
-	{
-		return true;
+	@Getter
+	private int mouldId, halfBakedId, toolId;
+
+	ItemOrderType(int mouldId, int halfBakedId, int toolId){
+		this.mouldId = mouldId;
+		this.halfBakedId = halfBakedId;
+		this.toolId = toolId;
 	}
 }

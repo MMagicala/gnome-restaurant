@@ -26,30 +26,37 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
+import java.util.ArrayList;
+import lombok.Getter;
+import lombok.Setter;
 
-@ConfigGroup("gnomerestaurant")
-public interface GnomeRestaurantConfig extends Config
+public class StageNode
 {
-	@ConfigItem(
-		keyName = "showOverlay",
-		name = "Show Overlay",
-		description = "Configures whether to show the overlay window"
-	)
-	default boolean showOverlay()
+	@Getter
+	private final MinigameStage stage;
+	@Getter
+	private final int producedItemId;
+	@Getter
+	private final ArrayList<CookingItem> otherRequiredItems;
+
+	// First node, no produced item before it
+
+	public StageNode(MinigameStage stage, ArrayList<CookingItem> otherRequiredItems)
 	{
-		return true;
+		this(stage, otherRequiredItems, -1);
 	}
 
-	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
-		description = "Configures whether to show the order timer"
-	)
-	default boolean showTimer()
+	// No extra items required for this stage
+
+	public StageNode(MinigameStage stage, int producedItemId)
 	{
-		return true;
+		this(stage, new ArrayList<>(), producedItemId);
+	}
+
+	public StageNode(MinigameStage stage, ArrayList<CookingItem> otherRequiredItems, int producedItemId)
+	{
+		this.stage = stage;
+		this.otherRequiredItems = otherRequiredItems;
+		this.producedItemId = producedItemId;
 	}
 }
