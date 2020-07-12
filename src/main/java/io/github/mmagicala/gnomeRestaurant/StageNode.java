@@ -28,7 +28,6 @@ package io.github.mmagicala.gnomeRestaurant;
 
 import java.util.ArrayList;
 import lombok.Getter;
-import lombok.Setter;
 
 public class StageNode
 {
