@@ -79,6 +79,9 @@ public class GnomeRestaurantPlugin extends Plugin
 	private static final Pattern DELIVERY_START_PATTERN =
 		Pattern.compile("([\\w .]+) wants (?:some|a) ([\\w ]+)");
 
+	private static final String EASY_DELIVERY_DELAY_TEXT = "Fine, your loss. If you want another easy job one come back in five minutes and maybe I'll be able to find you one.";
+	private static final String HARD_DELIVERY_DELAY_TEXT = "Fine, your loss. I may have an easier job for you, since you chickened out of that one, If you want another hard one come back in five minutes and maybe I'll be able to find you a something.";
+
 	private static final ImmutableSet<String> easyOrderNPCs = ImmutableSet.of(
 		"Burkor", "Brimstall", "Captain Errdo", "Coach", "Dalila", "Damwin", "Eebel", "Ermin", "Femi", "Froono",
 		"Guard Vemmeldo", "Gulluck", "His Royal Highness King Narnode", "Meegle", "Perrdur", "Rometti", "Sarble",
@@ -88,7 +91,7 @@ public class GnomeRestaurantPlugin extends Plugin
 	private static final ImmutableSet<String> hardOrderNPCs = ImmutableSet.of(
 		"Ambassador Ferrnook", "Ambassador Gimblewap", "Ambassador Spanfipple", "Brambickle", "Captain Bleemadge", "Captain Daerkin",
 		"Captain Dalbur", "Captain Klemfoodle", "Captain Ninto", "G.L.O Caranock", "Garkor",
-		"Gnormadium Avlafrim", "Hazelmere", "Lieutenant Schepbur", "Penwie", "Professor Imblewyn", "Professor Manglethorp",
+		"Gnormadium Avlafrim", "Hazelmere", "King Bolren", "Lieutenant Schepbur", "Penwie", "Professor Imblewyn", "Professor Manglethorp",
 		"Professor Onglewip", "Wingstone"
 	);
 
@@ -110,7 +113,7 @@ public class GnomeRestaurantPlugin extends Plugin
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
-	private Timer timer;
+	private Timer orderTimer, delayTimer;
 	private Overlay overlay;
 
 	@Inject
@@ -481,7 +484,8 @@ public class GnomeRestaurantPlugin extends Plugin
 
 	private void reset()
 	{
-		removeTimer();
+		removeOrderTimer();
+		removeDelayTimer();
 		removeOverlay();
 		client.clearHintArrow();
 
@@ -492,8 +496,7 @@ public class GnomeRestaurantPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (!isTrackingDelivery
-			&& client.getWidget(WidgetInfo.DIALOG_NPC_NAME) != null
+		if (client.getWidget(WidgetInfo.DIALOG_NPC_NAME) != null
 			&& client.getWidget(WidgetInfo.DIALOG_NPC_NAME).getText().equals("Gianne jnr.")
 		)
 		{
@@ -503,18 +506,28 @@ public class GnomeRestaurantPlugin extends Plugin
 
 			dialog = dialog.replace("<br>", " ");
 
-			Matcher deliveryStartMatcher = DELIVERY_START_PATTERN.matcher(dialog);
-
-			if (deliveryStartMatcher.find())
+			if (!isTrackingDelivery)
 			{
-				startDelivery(deliveryStartMatcher.group(1), deliveryStartMatcher.group(2));
+				Matcher deliveryStartMatcher = DELIVERY_START_PATTERN.matcher(dialog);
+
+				if (deliveryStartMatcher.find())
+				{
+					startTrackingDelivery(deliveryStartMatcher.group(1), deliveryStartMatcher.group(2));
+				}
+			}
+
+			if (config.showDelayTimer() && delayTimer == null && (dialog.contains(EASY_DELIVERY_DELAY_TEXT) || dialog.contains(HARD_DELIVERY_DELAY_TEXT)))
+			{
+				delayTimer = new Timer(5, ChronoUnit.MINUTES, itemManager.getImage(ItemID.ALUFT_ALOFT_BOX), this);
+				delayTimer.setTooltip("Cannot place an order at this time");
+				infoBoxManager.addInfoBox(delayTimer);
 			}
 		}
 	}
 
-	private void startDelivery(String orderRecipient, String orderName)
+	private void startTrackingDelivery(String orderRecipient, String orderName)
 	{
-		// Don't track delivery if both the timer and overlay are disabled
+		// We cannot test the overlay if it is disabled
 
 		if (!config.showOverlay() && isDeliveryForTesting)
 		{
@@ -536,6 +549,10 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 
 		isTrackingDelivery = true;
+
+		// Delete the delay timer if it is active (we can choose hard orders during a delay)
+
+		removeDelayTimer();
 
 		if (config.showOverlay())
 		{
@@ -564,7 +581,7 @@ public class GnomeRestaurantPlugin extends Plugin
 			overlayManager.add(overlay);
 		}
 
-		if (config.showTimer())
+		if (config.showOrderTimer())
 		{
 			int numSecondsLeft = -1;
 
@@ -579,11 +596,11 @@ public class GnomeRestaurantPlugin extends Plugin
 
 			assert (numSecondsLeft != -1);
 
-			timer = new Timer(numSecondsLeft, ChronoUnit.SECONDS, itemManager.getImage(itemOrder.getItemId()), this);
+			orderTimer = new Timer(numSecondsLeft, ChronoUnit.SECONDS, itemManager.getImage(itemOrder.getItemId()), this);
 
 			String tooltipText = "Deliver " + orderName + " to " + orderRecipient;
-			timer.setTooltip(tooltipText);
-			infoBoxManager.addInfoBox(timer);
+			orderTimer.setTooltip(tooltipText);
+			infoBoxManager.addInfoBox(orderTimer);
 		}
 
 		// Draw hint arrow if we can already identify the NPC
@@ -843,9 +860,14 @@ public class GnomeRestaurantPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!config.showTimer())
+		if (!config.showDelayTimer())
 		{
-			removeTimer();
+			removeDelayTimer();
+		}
+
+		if (!config.showOrderTimer())
+		{
+			removeOrderTimer();
 		}
 
 		if (!config.showOverlay())
@@ -870,10 +892,16 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 	}
 
-	private void removeTimer()
+	private void removeOrderTimer()
 	{
-		infoBoxManager.removeInfoBox(timer);
-		timer = null;
+		infoBoxManager.removeInfoBox(orderTimer);
+		orderTimer = null;
+	}
+
+	private void removeDelayTimer()
+	{
+		infoBoxManager.removeInfoBox(delayTimer);
+		delayTimer = null;
 	}
 
 	private void removeOverlay()
@@ -903,7 +931,7 @@ public class GnomeRestaurantPlugin extends Plugin
 		try
 		{
 			isDeliveryForTesting = true;
-			startDelivery(recipientName, orderName);
+			startTrackingDelivery(recipientName, orderName);
 		}
 		catch (InvalidParameterException e)
 		{

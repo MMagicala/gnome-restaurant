@@ -44,11 +44,21 @@ public interface GnomeRestaurantConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "showTimer",
-		name = "Show Timer",
+		keyName = "showOrderTimer",
+		name = "Show Order Timer",
 		description = "Configures whether to show the order timer"
 	)
-	default boolean showTimer()
+	default boolean showOrderTimer()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "showDelayTimer",
+		name = "Show Delay Timer",
+		description = "Configures whether to show the order delay timer"
+	)
+	default boolean showDelayTimer()
 	{
 		return true;
 	}
