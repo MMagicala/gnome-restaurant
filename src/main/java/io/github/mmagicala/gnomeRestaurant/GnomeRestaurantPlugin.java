@@ -506,11 +506,17 @@ public class GnomeRestaurantPlugin extends Plugin
 
 			dialog = dialog.replace("<br>", " ");
 
-			if (!isTrackingDelivery)
-			{
-				Matcher deliveryStartMatcher = DELIVERY_START_PATTERN.matcher(dialog);
+			Matcher deliveryStartMatcher = DELIVERY_START_PATTERN.matcher(dialog);
 
-				if (deliveryStartMatcher.find())
+			if (deliveryStartMatcher.find())
+			{
+				if (isTrackingDelivery && isDeliveryForTesting)
+				{
+					reset();
+					chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value("Gnome Restaurant test cancelled. Real order started.").build());
+				}
+
+				if (!isTrackingDelivery)
 				{
 					startTrackingDelivery(deliveryStartMatcher.group(1), deliveryStartMatcher.group(2));
 				}
