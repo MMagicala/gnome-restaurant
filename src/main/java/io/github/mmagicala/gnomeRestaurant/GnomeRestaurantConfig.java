@@ -52,4 +52,14 @@ public interface GnomeRestaurantConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "showHintArrow",
+		name = "Show Hint Arrow",
+		description = "Configures whether to show the hint arrow above the order recipient"
+	)
+	default boolean showHintArrow()
+	{
+		return true;
+	}
 }

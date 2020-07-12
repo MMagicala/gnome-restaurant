@@ -49,11 +49,14 @@ import net.runelite.api.Client;
 import net.runelite.api.InventoryID;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.ItemID;
+import net.runelite.api.NPC;
 import net.runelite.api.VarPlayer;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.chat.ChatMessageManager;
@@ -62,6 +65,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.NPCManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.Overlay;
@@ -457,7 +461,10 @@ public class GnomeRestaurantPlugin extends Plugin
 	});
 
 	private ItemOrder itemOrder;
+	private String orderRecipient;
+
 	private int currentStageNodeIndex;
+	private boolean isTrackingDelivery = false;
 
 	public String getCurrentStageDirections()
 	{
@@ -479,17 +486,17 @@ public class GnomeRestaurantPlugin extends Plugin
 	{
 		removeTimer();
 		removeOverlay();
+		client.clearHintArrow();
 
-		if (isDeliveryForTesting)
-		{
-			isDeliveryForTesting = false;
-		}
+		isDeliveryForTesting = false;
+		isTrackingDelivery = false;
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (!isTrackingDelivery() && client.getWidget(WidgetInfo.DIALOG_NPC_NAME) != null
+		if (!isTrackingDelivery
+			&& client.getWidget(WidgetInfo.DIALOG_NPC_NAME) != null
 			&& client.getWidget(WidgetInfo.DIALOG_NPC_NAME).getText().equals("Gianne jnr.")
 		)
 		{
@@ -512,20 +519,26 @@ public class GnomeRestaurantPlugin extends Plugin
 	{
 		// Don't track delivery if both the timer and overlay are disabled
 
-		if (!config.showOverlay() && !config.showTimer())
+		if (!config.showOverlay() && isDeliveryForTesting)
 		{
-			if(isDeliveryForTesting){
-				resetAndFailTest("Overlay must be enabled.");
-			}
+			resetAndFailTest("Overlay must be enabled.");
 			return;
 		}
 
 		itemOrder = itemOrders.get(orderName);
+		this.orderRecipient = orderRecipient;
 
 		if (itemOrder == null)
 		{
 			throw new InvalidParameterException("No order found with the name " + orderName);
 		}
+
+		if (!easyOrderNPCs.contains(orderRecipient) && !hardOrderNPCs.contains(orderRecipient))
+		{
+			throw new InvalidParameterException("No recipient found with the name " + orderName);
+		}
+
+		isTrackingDelivery = true;
 
 		if (config.showOverlay())
 		{
@@ -567,16 +580,73 @@ public class GnomeRestaurantPlugin extends Plugin
 				numSecondsLeft = 660;
 			}
 
-			if (numSecondsLeft == -1)
-			{
-				throw new InvalidParameterException("No recipient found with the name " + orderRecipient);
-			}
+			assert (numSecondsLeft != -1);
 
 			timer = new Timer(numSecondsLeft, ChronoUnit.SECONDS, itemManager.getImage(itemOrder.getItemId()), this);
 
 			String tooltipText = "Deliver " + orderName + " to " + orderRecipient;
 			timer.setTooltip(tooltipText);
 			infoBoxManager.addInfoBox(timer);
+		}
+
+		// Draw hint arrow if we can already identify the NPC
+
+		if (config.showHintArrow())
+		{
+			markNPCFromCache();
+		}
+	}
+
+	private void markNPCFromCache()
+	{
+		NPC[] npcs = client.getCachedNPCs();
+
+		for (NPC npc : npcs)
+		{
+			if (toggleMarkRecipient(npc, true))
+			{
+				return;
+			}
+		}
+	}
+
+	private boolean toggleMarkRecipient(NPC npc, boolean mark)
+	{
+		if (npc == null || npc.getName() == null)
+		{
+			return false;
+		}
+
+		if (npc.getName().equals(orderRecipient))
+		{
+			if (mark)
+			{
+				client.setHintArrow(npc);
+			}
+			else
+			{
+				client.clearHintArrow();
+			}
+			return true;
+		}
+		return false;
+	}
+
+	@Subscribe
+	public void onNpcSpawned(final NpcSpawned event)
+	{
+		if (isTrackingDelivery && config.showHintArrow())
+		{
+			toggleMarkRecipient(event.getNpc(), true);
+		}
+	}
+
+	@Subscribe
+	public void onNpcDespawned(final NpcDespawned event)
+	{
+		if (isTrackingDelivery && config.showHintArrow())
+		{
+			toggleMarkRecipient(event.getNpc(), false);
 		}
 	}
 
@@ -651,17 +721,12 @@ public class GnomeRestaurantPlugin extends Plugin
 		}, itemOrder.getItemId()));
 	}
 
-	private boolean isTrackingDelivery()
-	{
-		return overlay != null || timer != null;
-	}
-
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
 		// Ignore varbit changes while we are testing
 
-		if (isTrackingDelivery() && !isDeliveryForTesting && client.getVarbitValue(2478) == 0)
+		if (isTrackingDelivery && !isDeliveryForTesting && client.getVarbitValue(2478) == 0)
 		{
 			reset();
 		}
@@ -790,9 +855,21 @@ public class GnomeRestaurantPlugin extends Plugin
 		{
 			removeOverlay();
 
-			if(isDeliveryForTesting){
+			if (isDeliveryForTesting)
+			{
 				resetAndFailTest("Overlay must be enabled.");
 			}
+		}
+
+		if (!config.showHintArrow())
+		{
+			client.clearHintArrow();
+		}
+		else if (isTrackingDelivery)
+		{
+			// Re-enable hint arrow
+
+			markNPCFromCache();
 		}
 	}
 
@@ -837,7 +914,8 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 	}
 
-	private void resetAndFailTest(String message){
+	private void resetAndFailTest(String message)
+	{
 		reset();
 		String errorMessage = "Gnome Restaurant test failed. " + message;
 		chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value(errorMessage).build());
