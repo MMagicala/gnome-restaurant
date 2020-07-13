@@ -26,6 +26,7 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Provides;
 import io.github.mmagicala.gnomeRestaurant.itemOrder.BakedOrder;
@@ -37,6 +38,7 @@ import java.security.InvalidParameterException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -82,18 +84,59 @@ public class GnomeRestaurantPlugin extends Plugin
 	private static final String EASY_DELIVERY_DELAY_TEXT = "Fine, your loss. If you want another easy job one come back in five minutes and maybe I'll be able to find you one.";
 	private static final String HARD_DELIVERY_DELAY_TEXT = "Fine, your loss. I may have an easier job for you, since you chickened out of that one, If you want another hard one come back in five minutes and maybe I'll be able to find you a something.";
 
-	private static final ImmutableSet<String> easyOrderNPCs = ImmutableSet.of(
-		"Burkor", "Brimstall", "Captain Errdo", "Coach", "Dalila", "Damwin", "Eebel", "Ermin", "Femi", "Froono",
-		"Guard Vemmeldo", "Gulluck", "His Royal Highness King Narnode", "Meegle", "Perrdur", "Rometti", "Sarble",
-		"Trainer Nacklepen", "Wurbel", "Heckel Funch"
-	);
+	// NPC printed and actual names
 
-	private static final ImmutableSet<String> hardOrderNPCs = ImmutableSet.of(
-		"Ambassador Ferrnook", "Ambassador Gimblewap", "Ambassador Spanfipple", "Brambickle", "Captain Bleemadge", "Captain Daerkin",
-		"Captain Dalbur", "Captain Klemfoodle", "Captain Ninto", "G.L.O Caranock", "Garkor",
-		"Gnormadium Avlafrim", "Hazelmere", "King Bolren", "Lieutenant Schepbur", "Penwie", "Professor Imblewyn", "Professor Manglethorp",
-		"Professor Onglewip", "Wingstone"
-	);
+	private static final HashMap<String, String> easyOrderNPCs = new HashMap<String, String>()
+	{
+		{
+			put("Burkor", "");
+			put("Brimstall", "");
+			put("Captain Errdo", "");
+			put("Coach", "Gnome Coach");
+			put("Dalila", "");
+			put("Damwin", "");
+			put("Eebel", "");
+			put("Ermin", "");
+			put("Femi", "");
+			put("Froono", "");
+			put("Guard Vemmeldo", "");
+			put("Gulluck", "");
+			put("His Royal Highness King Narnode", "");
+			put("Meegle", "");
+			put("Perrdur", "");
+			put("Rometti", "");
+			put("Sarble", "");
+			put("Trainer Nacklepen", "");
+			put("Wurbel", "");
+			put("Heckel Funch", "");
+		}
+	};
+
+	private static final HashMap<String, String> hardOrderNPCs = new HashMap<String, String>()
+	{
+		{
+			put("Ambassador Ferrnook", "");
+			put("Ambassador Gimblewap", "");
+			put("Ambassador Spanfipple", "");
+			put("Brambickle", "");
+			put("Captain Bleemadge", "");
+			put("Captain Daerkin", "");
+			put("Captain Dalbur", "");
+			put("Captain Klemfoodle", "");
+			put("Captain Ninto", "");
+			put("G.L.O Caranock", "");
+			put("Garkor", "");
+			put("Gnormadium Avlafrim", "");
+			put("Hazelmere", "");
+			put("King Bolren", "");
+			put("Lieutenant Schepbur", "");
+			put("Penwie", "");
+			put("Professor Imblewyn", "");
+			put("Professor Manglethorp", "");
+			put("Professor Onglewip", "");
+			put("Wingstone", "");
+		}
+	};
 
 	@Inject
 	private Client client;
@@ -461,7 +504,7 @@ public class GnomeRestaurantPlugin extends Plugin
 	});
 
 	private ItemOrder itemOrder;
-	private String orderRecipient;
+	private String recipientRealName;
 
 	private int currentStageNodeIndex;
 	private boolean isTrackingDelivery = false;
@@ -531,7 +574,7 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 	}
 
-	private void startTrackingDelivery(String orderRecipient, String orderName)
+	private void startTrackingDelivery(String printedRecipientName, String orderName)
 	{
 		// We cannot test the overlay if it is disabled
 
@@ -542,14 +585,25 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 
 		itemOrder = itemOrders.get(orderName);
-		this.orderRecipient = orderRecipient;
 
 		if (itemOrder == null)
 		{
 			throw new InvalidParameterException("No order found with the name " + orderName);
 		}
 
-		if (!easyOrderNPCs.contains(orderRecipient) && !hardOrderNPCs.contains(orderRecipient))
+		boolean isHardOrder;
+
+		if (easyOrderNPCs.containsKey(printedRecipientName))
+		{
+			recipientRealName = easyOrderNPCs.get(printedRecipientName).equals("") ? printedRecipientName : easyOrderNPCs.get(printedRecipientName);
+			isHardOrder = false;
+		}
+		else if (hardOrderNPCs.containsKey(printedRecipientName))
+		{
+			recipientRealName = hardOrderNPCs.get(printedRecipientName).equals("") ? printedRecipientName : hardOrderNPCs.get(printedRecipientName);
+			isHardOrder = true;
+		}
+		else
 		{
 			throw new InvalidParameterException("No recipient found with the name " + orderName);
 		}
@@ -589,22 +643,20 @@ public class GnomeRestaurantPlugin extends Plugin
 
 		if (config.showOrderTimer())
 		{
-			int numSecondsLeft = -1;
+			int numSecondsLeft;
 
-			if (easyOrderNPCs.contains(orderRecipient))
-			{
-				numSecondsLeft = 360;
-			}
-			else if (hardOrderNPCs.contains(orderRecipient))
+			if (isHardOrder)
 			{
 				numSecondsLeft = 660;
 			}
-
-			assert (numSecondsLeft != -1);
+			else
+			{
+				numSecondsLeft = 360;
+			}
 
 			orderTimer = new Timer(numSecondsLeft, ChronoUnit.SECONDS, itemManager.getImage(itemOrder.getItemId()), this);
 
-			String tooltipText = "Deliver " + orderName + " to " + orderRecipient;
+			String tooltipText = "Deliver " + orderName + " to " + recipientRealName;
 			orderTimer.setTooltip(tooltipText);
 			infoBoxManager.addInfoBox(orderTimer);
 		}
@@ -637,7 +689,7 @@ public class GnomeRestaurantPlugin extends Plugin
 			return false;
 		}
 
-		if (npc.getName().equals(orderRecipient))
+		if (npc.getName().equals(recipientRealName))
 		{
 			if (mark)
 			{
