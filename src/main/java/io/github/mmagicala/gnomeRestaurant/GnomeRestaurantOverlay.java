@@ -62,9 +62,12 @@ public class GnomeRestaurantOverlay extends OverlayPanel
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		String stageText = "Step: " +
+
+		String sb = "Step " +
+			(plugin.getCurrentStageNodeIndex() + 1) +
+			": " +
 			plugin.getCurrentStageDirections();
-		LineComponent stageRow = LineComponent.builder().left(stageText).build();
+		LineComponent stageRow = LineComponent.builder().left(sb).build();
 		panelComponent.getChildren().add(stageRow);
 
 		renderOverlayTable(currentStageOverlayTable, "Current Items");

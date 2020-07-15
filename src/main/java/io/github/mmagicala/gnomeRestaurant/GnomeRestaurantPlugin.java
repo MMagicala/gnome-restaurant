@@ -26,8 +26,6 @@
 
 package io.github.mmagicala.gnomeRestaurant;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.Provides;
 import io.github.mmagicala.gnomeRestaurant.itemOrder.BakedOrder;
 import io.github.mmagicala.gnomeRestaurant.itemOrder.BakedToppedOrder;
@@ -45,6 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.inject.Named;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -69,7 +68,6 @@ import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
@@ -522,7 +520,10 @@ public class GnomeRestaurantPlugin extends Plugin
 	// Stage nodes
 
 	private final ArrayList<StageNode> stageNodes = new ArrayList<>();
+
+	@Getter
 	private int currentStageNodeIndex;
+
 	public String getCurrentStageDirections()
 	{
 		return stageNodes.get(currentStageNodeIndex).getStage().directions;
@@ -550,7 +551,6 @@ public class GnomeRestaurantPlugin extends Plugin
 		removeOverlay();
 		client.clearHintArrow();
 
-		isDeliveryForTesting = false;
 		isTrackingDelivery = false;
 	}
 
@@ -569,17 +569,14 @@ public class GnomeRestaurantPlugin extends Plugin
 
 			Matcher deliveryStartMatcher = DELIVERY_START_PATTERN.matcher(dialog);
 
-			if (deliveryStartMatcher.find())
+			if (isDeliveryForTesting)
 			{
-				if (isTrackingDelivery && isDeliveryForTesting)
-				{
-					resetPluginAndTest("Test order cancelled. Real order started.");
-				}
+				resetPluginAndTest("Starting real delivery");
+			}
 
-				if (!isTrackingDelivery)
-				{
-					startTrackingDelivery(deliveryStartMatcher.group(1), deliveryStartMatcher.group(2));
-				}
+			if (deliveryStartMatcher.find() && !isTrackingDelivery)
+			{
+				startTrackingDelivery(deliveryStartMatcher.group(1), deliveryStartMatcher.group(2));
 			}
 
 			// Show delay timer if player refuses the order
@@ -595,6 +592,10 @@ public class GnomeRestaurantPlugin extends Plugin
 
 	private void startTrackingDelivery(String printedRecipientName, String orderName)
 	{
+		// Players can change their order upon earning a full reward token
+
+		reset();
+
 		itemOrder = itemOrders.get(orderName);
 
 		if (itemOrder == null)
@@ -616,7 +617,7 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 		else
 		{
-			throw new InvalidParameterException("No recipient found with the name " + orderName);
+			throw new InvalidParameterException("No recipient found with the name " + printedRecipientName);
 		}
 
 		isTrackingDelivery = true;
@@ -824,7 +825,7 @@ public class GnomeRestaurantPlugin extends Plugin
 	 * Update stage according to inventory and update / rebuild overlay tables
 	 * @param forceRebuildOverlayTables Set this to true when we need to build an overlay table upon receiving a delivery
 	 */
-	private boolean updateStage(ItemContainer inventory, boolean forceRebuildOverlayTables)
+	private void updateStage(ItemContainer inventory, boolean forceRebuildOverlayTables)
 	{
 		int traversedStageNodeIndex = stageNodes.size() - 1;
 
@@ -838,7 +839,7 @@ public class GnomeRestaurantPlugin extends Plugin
 
 				rebuildOverlayTables(inventory);
 
-				return true;
+				return;
 			}
 			traversedStageNodeIndex--;
 		}
@@ -871,8 +872,6 @@ public class GnomeRestaurantPlugin extends Plugin
 				}
 			}
 		}
-
-		return false;
 	}
 
 	// Overlay methods
@@ -1003,8 +1002,12 @@ public class GnomeRestaurantPlugin extends Plugin
 
 		if (commandExecuted.getArguments()[0].equals("reset"))
 		{
-			reset();
-			printTestMessage("Test cleared. Plugin reset.");
+			resetPluginAndTest("Reset command called.");
+			return;
+		}
+		else if (isTrackingDelivery && !isDeliveryForTesting)
+		{
+			printTestMessage("Cannot run test when a real order is in progress");
 			return;
 		}
 
@@ -1024,8 +1027,6 @@ public class GnomeRestaurantPlugin extends Plugin
 
 		printTestMessage("Test started with arguments: " + orderName + ", " + recipientName);
 
-		reset();
-
 		try
 		{
 			isDeliveryForTesting = true;
@@ -1043,7 +1044,8 @@ public class GnomeRestaurantPlugin extends Plugin
 	private void resetPluginAndTest(String errorMessage)
 	{
 		reset();
-		printTestMessage("Test failed. Reason: " + errorMessage);
+		isDeliveryForTesting = false;
+		printTestMessage("Test cancelled. Reason: " + errorMessage);
 	}
 
 	private void printTestMessage(String message)
