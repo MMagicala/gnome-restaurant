@@ -51,6 +51,7 @@ import net.runelite.api.Client;
 import net.runelite.api.InventoryID;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.ItemID;
+import net.runelite.api.MenuAction;
 import net.runelite.api.NPC;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameTick;
@@ -64,9 +65,11 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
@@ -89,52 +92,52 @@ public class GnomeRestaurantPlugin extends Plugin
 	private static final HashMap<String, String> easyOrderNPCs = new HashMap<String, String>()
 	{
 		{
-			put("Burkor", "");
-			put("Brimstall", "");
-			put("Captain Errdo", "");
+			put("Burkor", null);
+			put("Brimstall", null);
+			put("Captain Errdo", null);
 			put("Coach", "Gnome Coach");
-			put("Dalila", "");
-			put("Damwin", "");
-			put("Eebel", "");
-			put("Ermin", "");
-			put("Femi", "");
-			put("Froono", "");
-			put("Guard Vemmeldo", "");
-			put("Gulluck", "");
-			put("His Royal Highness King Narnode", "");
-			put("Meegle", "");
-			put("Perrdur", "");
-			put("Rometti", "");
-			put("Sarble", "");
-			put("Trainer Nacklepen", "");
-			put("Wurbel", "");
-			put("Heckel Funch", "");
+			put("Dalila", null);
+			put("Damwin", null);
+			put("Eebel", null);
+			put("Ermin", null);
+			put("Femi", null);
+			put("Froono", null);
+			put("Guard Vemmeldo", null);
+			put("Gulluck", null);
+			put("His Royal Highness King Narnode", "King Narnode Shareen");
+			put("Meegle", null);
+			put("Perrdur", null);
+			put("Rometti", null);
+			put("Sarble", null);
+			put("Trainer Nacklepen", null);
+			put("Wurbel", null);
+			put("Heckel Funch", null);
 		}
 	};
 
 	private static final HashMap<String, String> hardOrderNPCs = new HashMap<String, String>()
 	{
 		{
-			put("Ambassador Ferrnook", "");
-			put("Ambassador Gimblewap", "");
-			put("Ambassador Spanfipple", "");
-			put("Brambickle", "");
-			put("Captain Bleemadge", "");
-			put("Captain Daerkin", "");
-			put("Captain Dalbur", "");
-			put("Captain Klemfoodle", "");
-			put("Captain Ninto", "");
-			put("G.L.O Caranock", "");
-			put("Garkor", "");
-			put("Gnormadium Avlafrim", "");
-			put("Hazelmere", "");
-			put("King Bolren", "");
-			put("Lieutenant Schepbur", "");
-			put("Penwie", "");
-			put("Professor Imblewyn", "");
-			put("Professor Manglethorp", "");
-			put("Professor Onglewip", "");
-			put("Wingstone", "");
+			put("Ambassador Ferrnook", null);
+			put("Ambassador Gimblewap", null);
+			put("Ambassador Spanfipple", null);
+			put("Brambickle", null);
+			put("Captain Bleemadge", null);
+			put("Captain Daerkin", null);
+			put("Captain Dalbur", null);
+			put("Captain Klemfoodle", null);
+			put("Captain Ninto", null);
+			put("G.L.O Caranock", null);
+			put("Garkor", null);
+			put("Gnormadium Avlafrim", null);
+			put("Hazelmere", null);
+			put("King Bolren", null);
+			put("Lieutenant Schepbur", null);
+			put("Penwie", null);
+			put("Professor Imblewyn", null);
+			put("Professor Manglethorp", null);
+			put("Professor Onglewip", null);
+			put("Wingstone", null);
 		}
 	};
 
@@ -156,13 +159,21 @@ public class GnomeRestaurantPlugin extends Plugin
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
+	// UI
+
 	private Timer orderTimer, delayTimer;
 	private Overlay overlay;
+
+	// Order status
 
 	@Inject
 	@Named("developerMode")
 	boolean developerMode;
 	private boolean isDeliveryForTesting = false;
+
+	private boolean isTrackingDelivery = false;
+
+	// Order data
 
 	private static final Map<String, ItemOrder> itemOrders = Collections.unmodifiableMap(new Hashtable<String, ItemOrder>()
 	{
@@ -503,21 +514,28 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 	});
 
+	// Order information
+
 	private ItemOrder itemOrder;
 	private String recipientRealName;
 
-	private int currentStageNodeIndex;
-	private boolean isTrackingDelivery = false;
+	// Stage nodes
 
+	private final ArrayList<StageNode> stageNodes = new ArrayList<>();
+	private int currentStageNodeIndex;
 	public String getCurrentStageDirections()
 	{
 		return stageNodes.get(currentStageNodeIndex).getStage().directions;
 	}
 
-	private final ArrayList<StageNode> stageNodes = new ArrayList<>();
+	// Overlay tables
 
 	private final Hashtable<Integer, OverlayEntry> currentItemsOverlayTable = new Hashtable<>();
 	private final Hashtable<Integer, OverlayEntry> futureItemsOverlayTable = new Hashtable<>();
+
+	// Overlay strings
+
+	public static final String OVERLAY_MENU_ENTRY_TEXT = "Reset Stage";
 
 	@Override
 	protected void shutDown() throws Exception
@@ -555,8 +573,7 @@ public class GnomeRestaurantPlugin extends Plugin
 			{
 				if (isTrackingDelivery && isDeliveryForTesting)
 				{
-					reset();
-					chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value("Gnome Restaurant test cancelled. Real order started.").build());
+					resetPluginAndTest("Test order cancelled. Real order started.");
 				}
 
 				if (!isTrackingDelivery)
@@ -564,6 +581,8 @@ public class GnomeRestaurantPlugin extends Plugin
 					startTrackingDelivery(deliveryStartMatcher.group(1), deliveryStartMatcher.group(2));
 				}
 			}
+
+			// Show delay timer if player refuses the order
 
 			if (config.showDelayTimer() && delayTimer == null && (dialog.contains(EASY_DELIVERY_DELAY_TEXT) || dialog.contains(HARD_DELIVERY_DELAY_TEXT)))
 			{
@@ -576,14 +595,6 @@ public class GnomeRestaurantPlugin extends Plugin
 
 	private void startTrackingDelivery(String printedRecipientName, String orderName)
 	{
-		// We cannot test the overlay if it is disabled
-
-		if (!config.showOverlay() && isDeliveryForTesting)
-		{
-			resetAndFailTest("Overlay must be enabled.");
-			return;
-		}
-
 		itemOrder = itemOrders.get(orderName);
 
 		if (itemOrder == null)
@@ -595,12 +606,12 @@ public class GnomeRestaurantPlugin extends Plugin
 
 		if (easyOrderNPCs.containsKey(printedRecipientName))
 		{
-			recipientRealName = easyOrderNPCs.get(printedRecipientName).equals("") ? printedRecipientName : easyOrderNPCs.get(printedRecipientName);
+			recipientRealName = easyOrderNPCs.get(printedRecipientName) == null ? printedRecipientName : easyOrderNPCs.get(printedRecipientName);
 			isHardOrder = false;
 		}
 		else if (hardOrderNPCs.containsKey(printedRecipientName))
 		{
-			recipientRealName = hardOrderNPCs.get(printedRecipientName).equals("") ? printedRecipientName : hardOrderNPCs.get(printedRecipientName);
+			recipientRealName = hardOrderNPCs.get(printedRecipientName) == null ? printedRecipientName : hardOrderNPCs.get(printedRecipientName);
 			isHardOrder = true;
 		}
 		else
@@ -621,24 +632,15 @@ public class GnomeRestaurantPlugin extends Plugin
 			rebuildStageNodeList();
 			currentStageNodeIndex = 0;
 
-			// Determine stage
+			// Determine initial stage, initialize overlay, and create overlay tables
 
 			ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
 			assert inventory != null;
 
-			updateStage(inventory);
-
-			if (shouldPluginTestingEnd())
-			{
-				return;
-			}
-
-			// Build overlay tables
-
-			rebuildOverlayTables(inventory);
-
 			overlay = new GnomeRestaurantOverlay(this, currentItemsOverlayTable, futureItemsOverlayTable);
 			overlayManager.add(overlay);
+
+			updateStage(inventory, true);
 		}
 
 		if (config.showOrderTimer())
@@ -796,7 +798,7 @@ public class GnomeRestaurantPlugin extends Plugin
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
-		// Ignore varbit changes while we are testing
+		// Ignore varbit changes while we are testing, since it will stay 0
 
 		if (isTrackingDelivery && !isDeliveryForTesting && client.getVarbitValue(2478) == 0)
 		{
@@ -814,27 +816,15 @@ public class GnomeRestaurantPlugin extends Plugin
 				return;
 			}
 
-			boolean stageChanged = updateStage(event.getItemContainer());
-
-			if (shouldPluginTestingEnd())
-			{
-				return;
-			}
-
-			// Update or rebuild overlay tables
-
-			if (stageChanged)
-			{
-				rebuildOverlayTables(event.getItemContainer());
-			}
-			else
-			{
-				updateOverlayTables(event.getItemContainer());
-			}
+			updateStage(event.getItemContainer(), false);
 		}
 	}
 
-	private boolean updateStage(ItemContainer inventory)
+	/**
+	 * Update stage according to inventory and update / rebuild overlay tables
+	 * @param forceRebuildOverlayTables Set this to true when we need to build an overlay table upon receiving a delivery
+	 */
+	private boolean updateStage(ItemContainer inventory, boolean forceRebuildOverlayTables)
 	{
 		int traversedStageNodeIndex = stageNodes.size() - 1;
 
@@ -843,17 +833,16 @@ public class GnomeRestaurantPlugin extends Plugin
 			if (inventory.contains(stageNodes.get(traversedStageNodeIndex).getProducedItemId()))
 			{
 				currentStageNodeIndex = traversedStageNodeIndex;
+
+				// Rebuild overlay tables after updating the stage
+
+				rebuildOverlayTables(inventory);
+
 				return true;
 			}
 			traversedStageNodeIndex--;
 		}
-		return false;
-	}
 
-	// Overlay table methods
-
-	private void updateOverlayTables(ItemContainer inventory)
-	{
 		ArrayList<Hashtable<Integer, OverlayEntry>> overlayTables = new ArrayList<Hashtable<Integer, OverlayEntry>>()
 		{
 			{
@@ -862,19 +851,52 @@ public class GnomeRestaurantPlugin extends Plugin
 			}
 		};
 
-		for (Hashtable<Integer, OverlayEntry> overlayTable : overlayTables)
+		if (forceRebuildOverlayTables)
 		{
-			for (Map.Entry<Integer, OverlayEntry> entry : overlayTable.entrySet())
+			rebuildOverlayTables(inventory);
+		}
+		else
+		{
+			// Simply update inventory counts for overlay tables if the stage has not changed
+
+			for (Hashtable<Integer, OverlayEntry> overlayTable : overlayTables)
 			{
-				int realInventoryCount = inventory.count(entry.getKey());
-				if (entry.getValue().getInventoryCount() != realInventoryCount)
+				for (Map.Entry<Integer, OverlayEntry> entry : overlayTable.entrySet())
 				{
-					entry.getValue().setInventoryCount(realInventoryCount);
+					int realInventoryCount = inventory.count(entry.getKey());
+					if (entry.getValue().getInventoryCount() != realInventoryCount)
+					{
+						entry.getValue().setInventoryCount(realInventoryCount);
+					}
 				}
 			}
 		}
+
+		return false;
 	}
 
+	// Overlay methods
+
+	@Subscribe
+	public void onOverlayMenuClicked(OverlayMenuClicked event)
+	{
+		if (event.getEntry().getMenuAction() == MenuAction.RUNELITE_OVERLAY &&
+			event.getEntry().getTarget().equals("Gnome Restaurant Overlay") &&
+			event.getEntry().getOption().equals(OVERLAY_MENU_ENTRY_TEXT))
+		{
+			// Reset to beginning stage, then update it again
+
+			currentStageNodeIndex = 0;
+
+			ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
+			assert inventory != null;
+			updateStage(inventory, true);
+		}
+	}
+
+	/**
+	 * Add overlay entries to an overlay table
+	 */
 	private void addItemsToOverlayTable(Hashtable<Integer, OverlayEntry> overlayTable, ItemContainer inventory, ArrayList<CookingItem> itemStacks)
 	{
 		for (CookingItem itemStack : itemStacks)
@@ -909,6 +931,8 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 	}
 
+	// Config
+
 	@Provides
 	GnomeRestaurantConfig provideConfig(ConfigManager configManager)
 	{
@@ -931,11 +955,6 @@ public class GnomeRestaurantPlugin extends Plugin
 		if (!config.showOverlay())
 		{
 			removeOverlay();
-
-			if (isDeliveryForTesting)
-			{
-				resetAndFailTest("Overlay must be enabled.");
-			}
 		}
 
 		if (!config.showHintArrow())
@@ -949,6 +968,8 @@ public class GnomeRestaurantPlugin extends Plugin
 			markNPCFromCache();
 		}
 	}
+
+	// UI cleaning
 
 	private void removeOrderTimer()
 	{
@@ -973,16 +994,35 @@ public class GnomeRestaurantPlugin extends Plugin
 	@Subscribe
 	public void onCommandExecuted(CommandExecuted commandExecuted)
 	{
+		// Must be in developer mode to send command
+
 		if (!developerMode || !commandExecuted.getCommand().equals("gnome") || commandExecuted.getArguments().length < 1)
 		{
 			return;
 		}
 
-		String orderName = commandExecuted.getArguments()[0].replace("_", " ");
-		String startMessage = "Gnome Restaurant test started... Arguments: " + orderName;
-		String recipientName = "Gnormadium Avlafrim";
+		if (commandExecuted.getArguments()[0].equals("reset"))
+		{
+			reset();
+			printTestMessage("Test cleared. Plugin reset.");
+			return;
+		}
 
-		chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value(startMessage).build());
+		String orderName = commandExecuted.getArguments()[0].replace("_", " ");
+		String recipientName;
+
+		// Default recipient
+
+		if (commandExecuted.getArguments().length < 2)
+		{
+			recipientName = "His Royal Highness King Narnode";
+		}
+		else
+		{
+			recipientName = commandExecuted.getArguments()[1].replace("_", " ");
+		}
+
+		printTestMessage("Test started with arguments: " + orderName + ", " + recipientName);
 
 		reset();
 
@@ -993,25 +1033,21 @@ public class GnomeRestaurantPlugin extends Plugin
 		}
 		catch (InvalidParameterException e)
 		{
-			resetAndFailTest(e.getMessage());
+			resetPluginAndTest(e.getMessage());
 		}
 	}
 
-	private void resetAndFailTest(String message)
+	/**
+	 * Reset plugin and test, and print out the reason
+	 */
+	private void resetPluginAndTest(String errorMessage)
 	{
 		reset();
-		String errorMessage = "Gnome Restaurant test failed. " + message;
-		chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value(errorMessage).build());
+		printTestMessage("Test failed. Reason: " + errorMessage);
 	}
 
-	private boolean shouldPluginTestingEnd()
+	private void printTestMessage(String message)
 	{
-		if (isDeliveryForTesting && stageNodes.get(currentStageNodeIndex).getStage() == MinigameStage.DELIVER)
-		{
-			reset();
-			chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value("Reached DELIVER stage. Gnome Restaurant testing ended.").build());
-			return true;
-		}
-		return false;
+		chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.GAMEMESSAGE).value(message).build());
 	}
 }

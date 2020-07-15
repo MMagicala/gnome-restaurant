@@ -29,9 +29,15 @@ package io.github.mmagicala.gnomeRestaurant;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.util.Hashtable;
 import java.util.Map;
+import javax.inject.Inject;
+import net.runelite.api.MenuAction;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.client.ui.overlay.components.ComponentConstants;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
@@ -40,12 +46,17 @@ public class GnomeRestaurantOverlay extends OverlayPanel
 	private final Hashtable<Integer, OverlayEntry> currentStageOverlayTable, futureItemsOverlayTable;
 	private final GnomeRestaurantPlugin plugin;
 
+	@Inject
 	protected GnomeRestaurantOverlay(GnomeRestaurantPlugin plugin, Hashtable<Integer, OverlayEntry> currentStageOverlayTable,
 									 Hashtable<Integer, OverlayEntry> futureItemsOverlayTable)
 	{
+		super(plugin);
 		this.plugin = plugin;
 		this.currentStageOverlayTable = currentStageOverlayTable;
 		this.futureItemsOverlayTable = futureItemsOverlayTable;
+		panelComponent.setBorder(new Rectangle());
+		panelComponent.setGap(new Point(0, ComponentConstants.STANDARD_BORDER / 2));
+		getMenuEntries().add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, GnomeRestaurantPlugin.OVERLAY_MENU_ENTRY_TEXT, "Gnome Restaurant Overlay"));
 	}
 
 	@Override
@@ -62,6 +73,7 @@ public class GnomeRestaurantOverlay extends OverlayPanel
 		{
 			renderOverlayTable(futureItemsOverlayTable, "Later Items");
 		}
+
 		return super.render(graphics);
 	}
 
